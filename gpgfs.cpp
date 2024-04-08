@@ -12,6 +12,7 @@
 #include <unistd.h>
 
 #include <iostream>
+#include <filesystem>
 #include <fstream>
 #include <vector>
 
@@ -24,11 +25,22 @@ static int gpgfs_getattr(const char *path, struct stat *stbuf, [[maybe_unused]] 
 	if(std::string_view{path} != "/")
 		return -ENOENT;
 
+	std::filesystem::path p(encryptedFilePath);
+	if(!std::filesystem::exists(p)) {
+		return -ENOENT;
+	}
+
+	std::error_code ec;
+	auto size = std::filesystem::file_size(p, ec);
+	if(ec) {
+		return -EIO;
+	}
+
 	stbuf->st_mode = S_IFREG | 0600;
 	stbuf->st_nlink = 1;
 	stbuf->st_uid = getuid();
 	stbuf->st_gid = getgid();
-	stbuf->st_size = 1024; // TODO: somehow figure out a good size
+	stbuf->st_size = size; // this seems to be a good guess for the decrypted size
 	stbuf->st_blocks = 0;
 	stbuf->st_atime = stbuf->st_mtime = stbuf->st_ctime = time(NULL);
 
