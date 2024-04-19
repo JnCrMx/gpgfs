@@ -10,6 +10,7 @@
 #include <gpgme++/engineinfo.h>
 
 #include <unistd.h>
+#include <syslog.h>
 
 #include <iostream>
 #include <filesystem>
@@ -33,6 +34,7 @@ static int gpgfs_getattr(const char *path, struct stat *stbuf, [[maybe_unused]] 
 	std::error_code ec;
 	auto size = std::filesystem::file_size(p, ec);
 	if(ec) {
+		syslog(LOG_ERR, "Failed to get file size for %s: %s", p.c_str(), ec.message().c_str());
 		return -EIO;
 	}
 
@@ -72,6 +74,7 @@ static int gpgfs_open(const char *path, [[maybe_unused]] struct fuse_file_info *
 
     auto res = ctx->decrypt(in, out);
 	if(res.error()) {
+		syslog(LOG_ERR, "GPG error for %s: %s", encryptedFilePath.c_str(), res.error().asString());
 		return -EIO;
 	}
 
