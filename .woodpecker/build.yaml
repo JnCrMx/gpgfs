@@ -20,7 +20,7 @@ steps:
     pull: true
     commands:
       - apt-get update
-      - apt-get upgrade
+      - DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
       - >-
         DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends
         libfuse3-dev:amd64 libgpgme-dev:amd64 libgpgmepp-dev:amd64
