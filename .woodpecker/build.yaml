@@ -25,6 +25,7 @@ steps:
         DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends
         pkg-config
         libfuse3-dev:amd64 libgpgme-dev:amd64 libgpgmepp-dev:amd64
+      - mkdir -p build
       - >-
         cmake
         -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=amd64
