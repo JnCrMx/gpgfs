@@ -1,0 +1,57 @@
+variables:
+  - &minio-settings
+    access_key:
+      from_secret: minio_access_key
+    secret_key:
+      from_secret: minio_secret_key
+    endpoint:
+      from_secret: minio_endpoint
+    path_style: true
+    region: eu-central-jcm
+
+matrix:
+  UBUNTU_VERSION:
+    - jammy
+    - noble
+
+steps:
+  build:
+    image: "git.jcm.re/jcm/cross-compile-clang-amd64:${UBUNTU_VERSION}"
+    pull: true
+    commands:
+      - apt-get update
+      - apt-get upgrade
+      - >-
+        DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends
+        libfuse3-dev:amd64 libgpgme-dev:amd64 libgpgmepp-dev:amd64
+      - >-
+        cmake
+        -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=amd64
+        -DCPACK_PACKAGE_FILE_NAME=gpgfs-${UBUNTU_VERSION}
+        -B build -S . 2>&1 | tee build/cmake-configure-${UBUNTU_VERSION}.log  
+      - cmake --build build --parallel=2 2>&1 | tee build/cmake-build-${UBUNTU_VERSION}.log
+      - cd build
+      - cpack -G DEB
+      - mkdir -p upload
+      - cp gpgfs-${UBUNTU_VERSION}.deb upload/gpgfs-${UBUNTU_VERSION}.deb
+  upload-build:
+    image: woodpeckerci/plugin-s3
+    settings:
+      <<: *minio-settings
+      bucket: woodpecker
+      source: build/upload/*
+      strip_prefix: build/upload/
+      target: /artifacts/${CI_REPO}/${CI_PIPELINE_NUMBER}/public/
+  upload-branch:
+    image: woodpeckerci/plugin-s3
+    settings:
+      <<: *minio-settings
+      bucket: woodpecker
+      source: build/upload/*
+      strip_prefix: build/upload/
+      target: /artifacts/${CI_REPO}/${CI_COMMIT_BRANCH}/public/
+  upload-packages:
+    image: curlimages/curl
+    commands:
+      - curl --user jcm:$GITEA_PACKAGE_TOKEN --upload-file build/upload/gpgfs-${UBUNTU_VERSION}.deb "https://git.jcm.re/api/packages/jcm/debian/pool/${UBUNTU_VERSION}/edge-${CI_COMMIT_BRANCH}/upload"
+    secrets: [ gitea_package_token ]
