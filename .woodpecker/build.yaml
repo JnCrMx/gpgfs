@@ -21,9 +21,11 @@ steps:
     commands:
       - apt-get update
       - DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
+      - wget "https://tools.jcm.re/fakedeb.php?arch=amd64&name=qtbase5-dev" -O /tmp/qtbase5-dev.deb
+      - apt-get install -y /tmp/qtbase5-dev.deb
       - >-
         DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends
-        pkg-config file
+        pkg-config file dpkg-shlibdeps
         libfuse3-dev:amd64 libgpgme-dev:amd64 libgpgmepp-dev:amd64
       - mkdir -p build
       - >-
