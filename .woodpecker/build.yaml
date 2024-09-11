@@ -14,6 +14,12 @@ matrix:
     - jammy
     - noble
 
+clone:
+  git:
+    image: docker.io/woodpeckerci/plugin-git:2.4.0
+    settings:
+      tags: true
+
 steps:
   build:
     image: "git.jcm.re/jcm/cross-compile-clang-amd64:17-${UBUNTU_VERSION}"
@@ -27,35 +33,48 @@ steps:
         DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends
         pkg-config file dpkg-dev
         libfuse3-dev:amd64 libgpgme-dev:amd64 libgpgmepp-dev:amd64
+      - BUILD_VERSION=$(git describe --tags --always)
       - mkdir -p build
       - >-
         cmake
+        -DBUILD_VERSION=$BUILD_VERSION
         -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=amd64
-        -DCPACK_PACKAGE_FILE_NAME=gpgfs-${UBUNTU_VERSION}
+        -DCPACK_PACKAGE_FILE_NAME=gpgfs-$BUILD_VERSION-${UBUNTU_VERSION}
         -B build -S . 2>&1 | tee build/cmake-configure-${UBUNTU_VERSION}.log  
       - cmake --build build --parallel=2 2>&1 | tee build/cmake-build-${UBUNTU_VERSION}.log
       - cd build
       - cpack -G DEB
-      - mkdir -p upload
-      - cp gpgfs-${UBUNTU_VERSION}.deb upload/gpgfs-${UBUNTU_VERSION}.deb
+      - mkdir -p upload/build upload/beta
+      - cp gpgfs-$BUILD_VERSION-${UBUNTU_VERSION}.deb upload/build/gpgfs-$BUILD_VERSION-${UBUNTU_VERSION}.deb
+      - cp gpgfs-$BUILD_VERSION-${UBUNTU_VERSION}.deb upload/beta/gpgfs-beta-${UBUNTU_VERSION}.deb
+  upload-logs:
+    image: woodpeckerci/plugin-s3
+    settings:
+      <<: *minio-settings
+      bucket: woodpecker
+      source: build/cmake-*-${UBUNTU_VERSION}.log
+      strip_prefix: build/
+      target: /artifacts/${CI_REPO}/${CI_PIPELINE_NUMBER}/public/
+    when:
+      - status: [ success, failure ]
   upload-build:
     image: woodpeckerci/plugin-s3
     settings:
       <<: *minio-settings
       bucket: woodpecker
-      source: build/upload/*
-      strip_prefix: build/upload/
+      source: build/upload/build/*
+      strip_prefix: build/upload/build/
       target: /artifacts/${CI_REPO}/${CI_PIPELINE_NUMBER}/public/
-  upload-branch:
+  upload-beta:
     image: woodpeckerci/plugin-s3
     settings:
       <<: *minio-settings
       bucket: woodpecker
-      source: build/upload/*
-      strip_prefix: build/upload/
+      source: build/upload/beta/*
+      strip_prefix: build/upload/beta/
       target: /artifacts/${CI_REPO}/${CI_COMMIT_BRANCH}/public/
   upload-packages:
     image: curlimages/curl
     commands:
-      - curl --user jcm:$GITEA_PACKAGE_TOKEN --upload-file build/upload/gpgfs-${UBUNTU_VERSION}.deb "https://git.jcm.re/api/packages/jcm/debian/pool/${UBUNTU_VERSION}/edge-${CI_COMMIT_BRANCH}/upload"
+      - curl --user jcm:$GITEA_PACKAGE_TOKEN --upload-file build/upload/beta/gpgfs-beta-${UBUNTU_VERSION}.deb "https://git.jcm.re/api/packages/jcm/debian/pool/${UBUNTU_VERSION}/edge-${CI_COMMIT_BRANCH}/upload"
     secrets: [ gitea_package_token ]
