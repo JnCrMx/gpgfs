@@ -33,6 +33,7 @@ steps:
         DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends
         pkg-config file dpkg-dev
         libfuse3-dev:amd64 libgpgme-dev:amd64 libgpgmepp-dev:amd64
+      - ln -sf /usr/bin/ld.lld-17 /usr/bin/ld
       - BUILD_VERSION=$(git describe --tags --always)
       - mkdir -p build
       - >-
